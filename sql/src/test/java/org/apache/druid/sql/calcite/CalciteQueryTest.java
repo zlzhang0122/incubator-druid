@@ -384,12 +384,12 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
         ImmutableList.of(),
         ImmutableList.of(
             new Object[]{"__time", "TIMESTAMP", "NO"},
-            new Object[]{"cnt", "BIGINT", "NO"},
+            new Object[]{"cnt", "BIGINT", useDefault ? "NO" : "YES"},
             new Object[]{"dim1", "VARCHAR", "YES"},
             new Object[]{"dim2", "VARCHAR", "YES"},
             new Object[]{"dim3", "VARCHAR", "YES"},
-            new Object[]{"m1", "FLOAT", "NO"},
-            new Object[]{"m2", "DOUBLE", "NO"},
+            new Object[]{"m1", "FLOAT", useDefault ? "NO" : "YES"},
+            new Object[]{"m2", "DOUBLE", useDefault ? "NO" : "YES"},
             new Object[]{"unique_dim1", "OTHER", "YES"}
         )
     );
@@ -415,11 +415,11 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
         ImmutableList.of(),
         ImmutableList.of(
             new Object[]{"__time", "TIMESTAMP", "NO"},
-            new Object[]{"cnt", "BIGINT", "NO"},
+            new Object[]{"cnt", "BIGINT", useDefault ? "NO" : "YES"},
             new Object[]{"dim1", "VARCHAR", "YES"},
             new Object[]{"dim2", "VARCHAR", "YES"},
-            new Object[]{"m1", "FLOAT", "NO"},
-            new Object[]{"m2", "DOUBLE", "NO"},
+            new Object[]{"m1", "FLOAT", useDefault ? "NO" : "YES"},
+            new Object[]{"m2", "DOUBLE", useDefault ? "NO" : "YES"},
             new Object[]{"unique_dim1", "OTHER", "YES"}
         )
     );
@@ -1125,7 +1125,7 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
   @Test
   public void testSelectProjectionFromSelectSingleColumnDescending() throws Exception
   {
-    // Regression test for https://github.com/apache/incubator-druid/issues/7768.
+    // Regression test for https://github.com/apache/druid/issues/7768.
 
     // After upgrading to Calcite 1.21, Calcite no longer respects the ORDER BY __time DESC
     // in the inner query. This is valid, as the SQL standard considers the subquery results to be an unordered
@@ -1705,7 +1705,16 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
                         .setInterval(querySegmentSpec(Filtration.eternity()))
                         .setGranularity(Granularities.ALL)
                         .setDimensions(dimensions(new DefaultDimensionSpec("d0", "_d0", ValueType.STRING)))
-                        .setAggregatorSpecs(aggregators(new CountAggregatorFactory("a0")))
+                        .setAggregatorSpecs(
+                            aggregators(
+                                useDefault
+                                ? new CountAggregatorFactory("a0")
+                                : new FilteredAggregatorFactory(
+                                    new CountAggregatorFactory("a0"),
+                                    not(selector("d1", null, null))
+                                )
+                            )
+                        )
                         .setHavingSpec(
                             having(
                                 bound(
@@ -1809,7 +1818,7 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
   @Test
   public void testHavingOnRatio() throws Exception
   {
-    // Test for https://github.com/apache/incubator-druid/issues/4264
+    // Test for https://github.com/apache/druid/issues/4264
 
     testQuery(
         "SELECT\n"
@@ -2266,6 +2275,76 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
   }
 
   @Test
+  public void testNullLongFilter() throws Exception
+  {
+    testQuery(
+        "SELECT COUNT(*)\n"
+        + "FROM druid.numfoo\n"
+        + "WHERE l1 IS NULL",
+        useDefault ? ImmutableList.of() : ImmutableList.of(
+            Druids.newTimeseriesQueryBuilder()
+                  .dataSource(CalciteTests.DATASOURCE3)
+                  .intervals(querySegmentSpec(Filtration.eternity()))
+                  .granularity(Granularities.ALL)
+                  .filters(selector("l1", null, null))
+                  .aggregators(aggregators(new CountAggregatorFactory("a0")))
+                  .context(TIMESERIES_CONTEXT_DEFAULT)
+                  .build()
+        ),
+        ImmutableList.of(
+            useDefault ? new Object[]{0L} : new Object[]{3L}
+        )
+    );
+  }
+
+  @Test
+  public void testNullDoubleFilter() throws Exception
+  {
+    testQuery(
+        "SELECT COUNT(*)\n"
+        + "FROM druid.numfoo\n"
+        + "WHERE d1 IS NULL",
+        useDefault ? ImmutableList.of() : ImmutableList.of(
+            Druids.newTimeseriesQueryBuilder()
+                  .dataSource(CalciteTests.DATASOURCE3)
+                  .intervals(querySegmentSpec(Filtration.eternity()))
+                  .granularity(Granularities.ALL)
+                  .filters(selector("d1", null, null))
+                  .aggregators(aggregators(new CountAggregatorFactory("a0")))
+                  .context(TIMESERIES_CONTEXT_DEFAULT)
+                  .build()
+        ),
+        ImmutableList.of(
+            useDefault ? new Object[]{0L} : new Object[]{3L}
+        )
+    );
+  }
+
+
+  @Test
+  public void testNullFloatFilter() throws Exception
+  {
+    testQuery(
+        "SELECT COUNT(*)\n"
+        + "FROM druid.numfoo\n"
+        + "WHERE f1 IS NULL",
+        useDefault ? ImmutableList.of() : ImmutableList.of(
+            Druids.newTimeseriesQueryBuilder()
+                  .dataSource(CalciteTests.DATASOURCE3)
+                  .intervals(querySegmentSpec(Filtration.eternity()))
+                  .granularity(Granularities.ALL)
+                  .filters(selector("f1", null, null))
+                  .aggregators(aggregators(new CountAggregatorFactory("a0")))
+                  .context(TIMESERIES_CONTEXT_DEFAULT)
+                  .build()
+        ),
+        ImmutableList.of(
+            useDefault ? new Object[]{0L} : new Object[]{3L}
+        )
+    );
+  }
+
+  @Test
   public void testEmptyStringEquality() throws Exception
   {
     if (NullHandling.replaceWithDefault()) {
@@ -2476,7 +2555,7 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
   @Test
   public void testGroupByNothingWithImpossibleTimeFilter() throws Exception
   {
-    // Regression test for https://github.com/apache/incubator-druid/issues/7671
+    // Regression test for https://github.com/apache/druid/issues/7671
 
     testQuery(
         "SELECT COUNT(*) FROM druid.foo\n"
@@ -2568,7 +2647,16 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
                   .dataSource(CalciteTests.DATASOURCE1)
                   .intervals(querySegmentSpec(Filtration.eternity()))
                   .granularity(Granularities.ALL)
-                  .aggregators(aggregators(new CountAggregatorFactory("a0")))
+                  .aggregators(
+                      aggregators(
+                          useDefault
+                          ? new CountAggregatorFactory("a0")
+                          : new FilteredAggregatorFactory(
+                              new CountAggregatorFactory("a0"),
+                              not(selector("cnt", null, null))
+                          )
+                      )
+                  )
                   .context(TIMESERIES_CONTEXT_DEFAULT)
                   .build()
         ),
@@ -2930,12 +3018,14 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
     testQuery(
         "SELECT COUNT(*), COUNT(cnt), COUNT(dim1), AVG(cnt), SUM(cnt), SUM(cnt) + MIN(cnt) + MAX(cnt), COUNT(dim2) FROM druid.foo",
         ImmutableList.of(
+
             Druids.newTimeseriesQueryBuilder()
                   .dataSource(CalciteTests.DATASOURCE1)
                   .intervals(querySegmentSpec(Filtration.eternity()))
                   .granularity(Granularities.ALL)
                   .aggregators(
-                      aggregators(
+                      useDefault
+                      ? aggregators(
                           new CountAggregatorFactory("a0"),
                           new FilteredAggregatorFactory(
                               new CountAggregatorFactory("a1"),
@@ -2951,17 +3041,40 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
                               not(selector("dim2", null, null))
                           )
                       )
+                      : aggregators(
+                          new CountAggregatorFactory("a0"),
+                          new FilteredAggregatorFactory(
+                              new CountAggregatorFactory("a1"),
+                              not(selector("cnt", null, null))
+                          ),
+                          new FilteredAggregatorFactory(
+                              new CountAggregatorFactory("a2"),
+                              not(selector("dim1", null, null))
+                          ),
+                          new LongSumAggregatorFactory("a3:sum", "cnt"),
+                          new CountAggregatorFactory("a3:count"),
+                          new LongSumAggregatorFactory("a4", "cnt"),
+                          new LongMinAggregatorFactory("a5", "cnt"),
+                          new LongMaxAggregatorFactory("a6", "cnt"),
+                          new FilteredAggregatorFactory(
+                              new CountAggregatorFactory("a7"),
+                              not(selector("dim2", null, null))
+                          )
+                      )
                   )
                   .postAggregators(
                       new ArithmeticPostAggregator(
-                          "a2",
+                          useDefault ? "a2" : "a3",
                           "quotient",
                           ImmutableList.of(
-                              new FieldAccessPostAggregator(null, "a2:sum"),
-                              new FieldAccessPostAggregator(null, "a2:count")
+                              new FieldAccessPostAggregator(null, useDefault ? "a2:sum" : "a3:sum"),
+                              new FieldAccessPostAggregator(null, useDefault ? "a2:count" : "a3:count")
                           )
                       ),
-                      expressionPostAgg("p0", "((\"a3\" + \"a4\") + \"a5\")")
+                      expressionPostAgg(
+                          "p0",
+                          useDefault ? "((\"a3\" + \"a4\") + \"a5\")" : "((\"a4\" + \"a5\") + \"a6\")"
+                      )
                   )
                   .context(TIMESERIES_CONTEXT_DEFAULT)
                   .build()
@@ -3509,7 +3622,7 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
   @Test
   public void testInFilterWith23Elements() throws Exception
   {
-    // Regression test for https://github.com/apache/incubator-druid/issues/4203.
+    // Regression test for https://github.com/apache/druid/issues/4203.
 
     final List<String> elements = new ArrayList<>();
     elements.add("abc");
@@ -4773,9 +4886,16 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
                             new DefaultDimensionSpec("v0", "v0", ValueType.LONG),
                             new DefaultDimensionSpec("d0", "_d0", ValueType.STRING)
                         ))
-                        .setAggregatorSpecs(aggregators(
-                            new CountAggregatorFactory("_a0")
-                        ))
+                        .setAggregatorSpecs(
+                            aggregators(
+                                useDefault
+                                ? new CountAggregatorFactory("_a0")
+                                : new FilteredAggregatorFactory(
+                                    new CountAggregatorFactory("_a0"),
+                                    not(selector("d1", null, null))
+                                )
+                            )
+                        )
                         .setContext(QUERY_CONTEXT_DEFAULT)
                         .build()
         ),
@@ -7497,7 +7617,7 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
   @Test
   public void testTimeExtractWithTooFewArguments() throws Exception
   {
-    // Regression test for https://github.com/apache/incubator-druid/pull/7710.
+    // Regression test for https://github.com/apache/druid/pull/7710.
     expectedException.expect(ValidationException.class);
     expectedException.expectCause(CoreMatchers.instanceOf(CalciteContextException.class));
     expectedException.expectCause(
@@ -7576,7 +7696,7 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
   {
     String nullValue = NullHandling.replaceWithDefault() ? "" : null;
 
-    // Regression test for https://github.com/apache/incubator-druid/issues/4208
+    // Regression test for https://github.com/apache/druid/issues/4208
     testQuery(
         "SELECT dim1, dim2 FROM druid.foo\n"
         + " WHERE dim2 IN (\n"
@@ -8031,9 +8151,16 @@ public class CalciteQueryTest extends BaseCalciteQueryTest
                             new DefaultDimensionSpec("d0", "_d0", ValueType.LONG),
                             new DefaultDimensionSpec("d1", "_d1", ValueType.STRING)
                         ))
-                        .setAggregatorSpecs(aggregators(
-                            new CountAggregatorFactory("a0")
-                        ))
+                        .setAggregatorSpecs(
+                            aggregators(
+                                useDefault
+                                ? new CountAggregatorFactory("a0")
+                                : new FilteredAggregatorFactory(
+                                    new CountAggregatorFactory("a0"),
+                                    not(selector("d2", null, null))
+                                )
+                            )
+                        )
                         .setContext(QUERY_CONTEXT_DEFAULT)
                         .build()
         ),

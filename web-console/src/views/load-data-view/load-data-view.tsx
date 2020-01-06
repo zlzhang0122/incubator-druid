@@ -740,8 +740,8 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
           <>
             <p>Load data accessible through HTTP(s).</p>
             <p>
-              Data must be in a text format and the HTTP(s) endpoint must be reachable by every
-              Druid process in the cluster.
+              Data must be in text, orc, or parquet format and the HTTP(s) endpoint must be
+              reachable by every Druid process in the cluster.
             </p>
           </>
         );
@@ -754,8 +754,8 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
             </p>
             <p>Load data directly from a local file.</p>
             <p>
-              Files must be in a text format and must be accessible to all the Druid processes in
-              the cluster.
+              Files must be in text, orc, or parquet format and must be accessible to all the Druid
+              processes in the cluster.
             </p>
           </>
         );
@@ -779,13 +779,13 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
         );
 
       case 'index_parallel:s3':
-        return <p>Load text based data from Amazon S3.</p>;
+        return <p>Load text based, orc, or parquet data from Amazon S3.</p>;
 
       case 'index_parallel:google':
-        return <p>Load text based data from the Google Blobstore.</p>;
+        return <p>Load text based, orc, or parquet data from the Google Blobstore.</p>;
 
       case 'index_parallel:hdfs':
-        return <p>Load text based data from HDFS.</p>;
+        return <p>Load text based, orc, or parquet data from HDFS.</p>;
 
       case 'kafka':
         return <p>Load streaming data in real-time from Apache Kafka.</p>;
@@ -2994,7 +2994,7 @@ export class LoadDataView extends React.PureComponent<LoadDataViewProps, LoadDat
           type: spec.type,
           spec,
 
-          // A hack to let context be set from the spec can be removed when https://github.com/apache/incubator-druid/issues/8662 is resolved
+          // A hack to let context be set from the spec can be removed when https://github.com/apache/druid/issues/8662 is resolved
           context: (spec as any).context,
         });
       } catch (e) {
